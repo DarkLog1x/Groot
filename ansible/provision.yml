@@ -1,0 +1,88 @@
+---
+- hosts: all
+  remote_user: ubuntu
+  gather_facts: no
+  pre_tasks:
+    - name: add key
+      apt_key:
+        keyserver: hkp://keyserver.ubuntu.com:80
+        id: 0C49F3730359A14518585931BC711F9BA15703C6
+
+    - name: add mongodb
+      apt_repository:
+        repo: deb [ arch=amd64,arm64 ] http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.4 multiverse
+        state: present
+
+    - name: Update and install python
+      apt: pkg={{ item }} state=installed update-cache=yes
+      with_items:
+        - python
+        - python-dev
+        - python-setuptools
+        - git-core
+        - gcc
+        - nmap
+        - ruby
+        - ruby-dev
+        - libsqlite3-dev
+        - make
+        - htop
+        - nload
+        - mongodb-org
+        - sqlite3
+
+  tasks:
+    - name: ping google
+      action: ping
+
+    - name: install pip
+      action: easy_install name=pip
+
+    - name: install openstack client and sqlalchemy
+      become: yes
+      become_method: sudo
+      action: command pip install python-openstackclient==2.6.0 python-novaclient==7.0.0 python-neutronclient tinydb slacker Twisted pymongo slackclient
+    - name: install gem
+      become: yes
+      become_method: sudo
+      action: command gem install ssh_scan
+
+    - name: copy file main
+      copy:
+        src: "{{ item }}"
+        dest: /home/ubuntu/
+        owner: ubuntu
+        group: ubuntu
+        mode: 0755
+      with_fileglob:
+        - ../python/*
+
+    - name: copy file keys
+      copy:
+        src: ../ssh_keys/keys
+        dest: /home/ubuntu/
+        owner: ubuntu
+        group: ubuntu
+        mode: 0644
+
+    - name: Mongod start
+      service:
+        name: mongod
+        state: started
+
+    - name: Creates a crontab for OSIDS
+      cron:
+        name: "run python"
+        minute: "*/30"
+        user: ubuntu
+        job: "/usr/bin/python /home/ubuntu/main.py"
+
+    - name: Run slackBot
+      shell: './slack.py'
+
+
+  handlers:
+    - name: ping again
+      action: ping
+
+
